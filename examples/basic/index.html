@@ -1,0 +1,55 @@
+<!--NODELY POTENTIAL EMBEDED HTML-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graphite.js - Basic Example</title>
+</head>
+<body>
+    <!-- basic styling for a fullscreen canvas -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: "Inter", sans-serif;
+        }
+
+        * {
+            transition: cubic-bezier(0.075, 0.82, 0.165, 1) .2s;
+        }
+
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0; 
+        }
+
+        input[type=number] {
+            -moz-appearance:textfield;
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #00000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #303030;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #191919;
+        }
+    </style>
+    <!-- the canvas Graphite.js will be using -->
+    <canvas id="graphite-canvas" style="width: 100vw; height: 100vh;"></canvas>
+
+    <script src="../../src/graphite.js"></script>
+    <script src="./main.js"></script>
+</body>
+</html>

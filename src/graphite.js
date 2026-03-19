@@ -848,6 +848,7 @@ class NodeWrapper {
 
             if (e.button === 2)
             {
+                e.preventDefault();
                 this.#OpenContextMenu(e.offsetX, e.offsetY);
             }
             else {
@@ -1027,7 +1028,10 @@ class NodeWrapper {
         contextMenu.style.overflow = 'hidden';
         contextMenu.style.overflowY = 'scroll';
         contextMenu.style.zIndex = 1000;
-        // BOX SHADOW BASED ON NODES' SHADOWS
+        contextMenu.style.opacity = 0;
+
+        setTimeout(() => contextMenu.style.opacity = 1, 0);
+
         contextMenu.style.boxShadow = '0px 0px ' + this.Renderer.ThemeSettings.ShadowBlur + "px " + this.Renderer.ThemeSettings.ShadowColor;
 
         this.#RenderContextMenu(contextMenu, x, y);
@@ -1038,7 +1042,11 @@ class NodeWrapper {
 
     #CloseContextMenu()
     {
-        document.querySelectorAll('#context-menu').forEach(m => m.remove());
+        document.querySelectorAll('#context-menu').forEach(function(m)
+        {
+            m.style.opacity = 0;
+            setTimeout(() => m.remove(), 200);
+        }); 
     }
 
     UpdateCanvas() {
@@ -1056,6 +1064,7 @@ class NodeWrapper {
     LinkCanvas(canvas) {
         this.Renderer.Canvas = canvas;
         this.Renderer.Context = canvas.getContext('2d');
+        canvas.oncontextmenu = (e) => e.preventDefault();
         this.UpdateCanvas();
         window.addEventListener('resize', this.UpdateCanvas.bind(this));
         this.#InputsConfigure();
@@ -2203,23 +2212,38 @@ class GetVariableNode extends Node
     }
 }
 
-class AlwaysNode extends Node
+class ActionConditionNode extends Node
 {
-    constructor()
+    constructor(name)
     {
-        super('Always');
+        super(name);
         this.Out = [
             new NodeOutput('->', this, 'action')
         ]
     }
 
-    Update()
-    {
+    DoesRun() { return false; }
+
+    Action() { 
         for(let i = 0; i < this.Out[0].LinkedProperties.length; i++)
         {
             this.Out[0].LinkedProperties[i].ParentNode.Action();
         }
     }
+
+    Update() {
+        if(this.DoesRun()) this.Action();
+    }
+}
+
+class AlwaysNode extends ActionConditionNode
+{
+    constructor()
+    {
+        super('Always');
+    }
+
+    DoesRun() { return true; }
 }
 
 class CommentNode extends Node
