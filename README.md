@@ -10,7 +10,7 @@
     Graphite.js is an open-source JavaScript library for building and managing flexible, performant, and clean node-based systems on the web.
 </p>
 
-<!--TODO: DOCS LINKS-->
+<a href="./docs/index.html"><h3 align="center">DOCUMENTATION</h3></a>
 
 <!--Badges-->
 <p align="center">
