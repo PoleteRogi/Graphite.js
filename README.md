@@ -10,8 +10,6 @@
     Graphite.js is an open-source JavaScript library for building and managing flexible, performant, and clean node-based systems on the web.
 </p>
 
-<a href="./docs/index.html"><h3 align="center">DOCUMENTATION</h3></a>
-
 <!--Badges-->
 <p align="center">
     <img src="https://img.shields.io/badge/license-MIT-blue"></img>
@@ -54,6 +52,7 @@ function update()
 // run update function
 update();
 ```
+[SEE DOCUMENTATION](./docs/manual/index.md)
 
 ## Contribution
 We welcome contributions from developers interested in helping us build Graphite.js. If you'd like to contribute, please fork this repository and submit a pull request.
