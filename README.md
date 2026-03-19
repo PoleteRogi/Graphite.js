@@ -32,25 +32,25 @@
 
 ## Basic Usage
 ```javascript
-    // create wrapper
-    const wrapper = new NodeWrapper();
+// create wrapper
+const wrapper = new NodeWrapper();
 
-    // link canvas to it
-    wrapper.LinkCanvas(document.getElementById('graphite-canvas'));
+// link canvas to it
+wrapper.LinkCanvas(document.getElementById('graphite-canvas'));
 
-    // register the node sets (the nodes the app will use)
-    NodeRegistry.RegisterSet(STANDARD_NODE_SET);
+// register the node sets (the nodes the app will use)
+NodeRegistry.RegisterSet(STANDARD_NODE_SET);
 
-    // update function for every frame (simple evaluation)
-    function update()
-    {
-        requestAnimationFrame(update);
-        
-        // update and evaluate all nodes
-        wrapper.UpdateNodes();
-    }
-    // run update function
-    update();
+// update function for every frame (simple evaluation)
+function update()
+{
+    requestAnimationFrame(update);
+    
+    // update and evaluate all nodes
+    wrapper.UpdateNodes();
+}
+// run update function
+update();
 ```
 
 ## Contribution
