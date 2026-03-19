@@ -24,6 +24,8 @@
 - Theme settings and loader
 - Easy integration into projects
 
+<img src=".github/assets/example.gif"></img>
+
 ## Pre-built Nodes
 - Math nodes
 - Logic nodes
