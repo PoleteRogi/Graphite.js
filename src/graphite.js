@@ -1051,12 +1051,22 @@ class NodeWrapper {
 
     UpdateCanvas() {
         const rect = this.Renderer.Canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
 
-        this.Renderer.Canvas.width = rect.width;
-        this.Renderer.Canvas.height = rect.height;
+        // Set actual pixel resolution
+        this.Renderer.Canvas.width = rect.width * dpr;
+        this.Renderer.Canvas.height = rect.height * dpr;
 
+        // Keep CSS size unchanged
+        this.Renderer.Canvas.style.width = rect.width + "px";
+        this.Renderer.Canvas.style.height = rect.height + "px";
+
+        // Store logical size (not scaled)
         this.Renderer.Width = rect.width;
         this.Renderer.Height = rect.height;
+
+        // Scale drawing context so everything matches
+        this.Renderer.Context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
         requestAnimationFrame(this.#OnUpdate.bind(this));
     }

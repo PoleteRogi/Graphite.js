@@ -30,8 +30,8 @@ class ReplicateNode extends Node
         super('Replicate');
 
         // create inputs and outputs
-        this.input = new NodeInput('MyInput', this, 'float');
-        this.output = new NodeOutput('MyOutput', this, 'float');
+        this.input = new NodeInput('MyInput', this, 'any');
+        this.output = new NodeOutput('MyOutput', this, 'any');
 
         this.In = [this.input];
         this.Out = [this.output];

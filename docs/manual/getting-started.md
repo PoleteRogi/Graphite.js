@@ -16,8 +16,10 @@ The `NodeWrapper` manages rendering, interaction, and node execution.
 We can link a canvas to the wrapper with the `LinkCanvas` function.
 
 ```javascript
+// Create wrapper
 const wrapper = new NodeWrapper();
 
+// Link the canvas to the wrapper
 wrapper.LinkCanvas(document.getElementById("graph"));
 ```
 
