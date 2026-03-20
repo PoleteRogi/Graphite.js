@@ -697,8 +697,8 @@ class NodeWrapper {
         }
         inputElement.value = staticValue.Value;
         inputElement.style.position = "absolute";
-        inputElement.style.left = staticValueRect.x + "px";
-        inputElement.style.top = staticValueRect.y + "px";
+        inputElement.style.left = this.Renderer.Canvas.offsetLeft + staticValueRect.x + "px";
+        inputElement.style.top = this.Renderer.Canvas.offsetTop + staticValueRect.y + "px";
         inputElement.style.width = staticValueRect.width + "px";
         inputElement.style.height = staticValueRect.height + "px";
         inputElement.style.fontSize = this.Renderer.ThemeSettings.TextSize * this.Renderer.Viewport.Zoom + "px";
@@ -1015,8 +1015,8 @@ class NodeWrapper {
 
         const contextMenu = document.createElement('div');
         contextMenu.id = 'context-menu';
-        contextMenu.style.left = x + 'px';
-        contextMenu.style.top = y + 'px';
+        contextMenu.style.left = this.Renderer.Canvas.offsetLeft + x + 'px';
+        contextMenu.style.top = this.Renderer.Canvas.offsetTop + y + 'px';
         contextMenu.style.width = this.Renderer.ThemeSettings.ContextMenuWidth + 'px';
         contextMenu.style.height = this.Renderer.ThemeSettings.ContextMenuHeight + 'px';
         contextMenu.style.position = 'absolute';
@@ -1051,24 +1051,16 @@ class NodeWrapper {
 
     UpdateCanvas() {
         const rect = this.Renderer.Canvas.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
 
         // Set actual pixel resolution
-        this.Renderer.Canvas.width = rect.width * dpr;
-        this.Renderer.Canvas.height = rect.height * dpr;
-
-        // Keep CSS size unchanged
-        this.Renderer.Canvas.style.width = rect.width + "px";
-        this.Renderer.Canvas.style.height = rect.height + "px";
+        this.Renderer.Canvas.width = rect.width;
+        this.Renderer.Canvas.height = rect.height;
 
         // Store logical size (not scaled)
         this.Renderer.Width = rect.width;
         this.Renderer.Height = rect.height;
 
-        // Scale drawing context so everything matches
-        this.Renderer.Context.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-        requestAnimationFrame(this.#OnUpdate.bind(this));
+        requestAnimationFrame(this.UpdateCanvas.bind(this));
     }
 
     LinkCanvas(canvas) {
@@ -1076,7 +1068,8 @@ class NodeWrapper {
         this.Renderer.Context = canvas.getContext('2d');
         canvas.oncontextmenu = (e) => e.preventDefault();
         this.UpdateCanvas();
-        window.addEventListener('resize', this.UpdateCanvas.bind(this));
+        requestAnimationFrame(this.#OnUpdate.bind(this));
+
         this.#InputsConfigure();
 
         // Center world origin by default
@@ -1633,485 +1626,7 @@ class FalseNode extends Node
     }
 }
 
-class Texture 
-{
-    constructor(sampleFn)
-    {
-        this.Sample = sampleFn // (u, v) => { return [r, g, b, a] }
-    }
-}
-
-class TextureNode extends Node {
-    constructor() {
-        super('Texture');
-
-        this.StaticValues = [
-            new StaticValue('Path', '', this, 'string')
-        ];
-
-        this.Out = [
-            new NodeOutput('Output', this, 'texture')
-        ];
-    }
-
-    Update() {
-        const path = this.GetStaticValue('Path');
-
-        this.Out[0].GetValue = () => {
-            return {
-                Path: path,
-                IsImage: true,
-
-                // placeholder sampler (real one will be handled later)
-                Sample: null
-            };
-        };
-    }
-}
-
-class Sampler2DNode extends Node {
-    constructor() {
-        super('Sampler2D');
-
-        this.In = [
-            new NodeInput('Texture', this, 'texture')
-        ];
-
-        this.Out = [
-            new NodeOutput('Output', this, 'texture')
-        ];
-    }
-
-    Update() {
-        const tex = this.GetInputValue('Texture');
-
-        this.Out[0].GetValue = () => {
-            if (!tex) return null;
-
-            // If it's procedural already → pass through
-            if (tex.Sample) {
-                return tex;
-            }
-
-            // If it's an image → create a sampler wrapper
-            if (tex.Path) {
-                return {
-                    Path: tex.Path,
-                    IsImage: true,
-
-                    // sampling handled later in MaterialOutputNode
-                    Sample: null
-                };
-            }
-
-            return null;
-        };
-    }
-}
-
-class NoiseNode extends Node {
-    constructor() {
-        super('Noise');
-
-        this.In = [
-            new NodeInput('Scale', this, 'float', 5)
-        ];
-
-        this.Out = [
-            new NodeOutput('Output', this, 'texture')
-        ];
-
-        // permutation table (fixed = stable noise)
-        this.p = new Uint8Array(512);
-        const perm = [];
-        for (let i = 0; i < 256; i++) perm[i] = i;
-
-        // shuffle
-        for (let i = 255; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [perm[i], perm[j]] = [perm[j], perm[i]];
-        }
-
-        for (let i = 0; i < 512; i++) {
-            this.p[i] = perm[i % 256];
-        }
-    }
-
-    Update() {
-        const scale = this.GetInputValue('Scale');
-
-        this.Out[0].GetValue = () => {
-            return {
-                Sample: (u, v) => {
-                    const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
-                    const lerp = (a, b, t) => a + t * (b - a);
-                    const grad = (hash, x, y) => {
-                        const h = hash & 3;
-                        return ((h & 1) ? x : -x) + ((h & 2) ? y : -y);
-                    };
-
-                    let x = u * scale;
-                    let y = v * scale;
-
-                    const X = Math.floor(x) & 255;
-                    const Y = Math.floor(y) & 255;
-
-                    x -= Math.floor(x);
-                    y -= Math.floor(y);
-
-                    const uFade = fade(x);
-                    const vFade = fade(y);
-
-                    const A = this.p[X] + Y;
-                    const B = this.p[X + 1] + Y;
-
-                    const noise = lerp(
-                        lerp(grad(this.p[A], x, y), grad(this.p[B], x - 1, y), uFade),
-                        lerp(grad(this.p[A + 1], x, y - 1), grad(this.p[B + 1], x - 1, y - 1), uFade),
-                        vFade
-                    );
-
-                    const val = (noise + 1) / 2;
-
-                    return [val, val, val, 1]; // RGBA
-                }
-            };
-        };
-    }
-}
-
-class MaterialNode extends Node
-{
-    constructor()
-    {
-        super('Material');
-        this.In = [
-            new NodeInput('Diffuse', this, 'color|texture', [1, 1, 1]),
-            new NodeInput('Specular', this, 'color|texture', [1, 1, 1]),
-            new NodeInput('Specular Intensity', this, 'float', 1),
-            new NodeInput('Roughness', this, 'float', 1),
-            new NodeInput('Opacity', this, 'float', 1)
-        ]
-
-        this.Out = [
-            new NodeOutput('Output', this, 'material')
-        ]
-    }
-
-    Update()
-    {
-        this.Out[0].GetValue = function()
-        {
-            return {
-                diffuse: this.ParentNode.GetInputValue('Diffuse'),
-                specular: this.ParentNode.GetInputValue('Specular'),
-                specularIntensity: this.ParentNode.GetInputValue('Specular Intensity'),
-                roughness: this.ParentNode.GetInputValue('Roughness'),
-                opacity: this.ParentNode.GetInputValue('Opacity')
-            }
-        }
-    }
-}
-
-class MaterialOutputNode extends Node
-{
-    threeMaterialReference;
-    // the "THREE" object
-    threeReference;
-    constructor(threeMaterialReference, threeReference)
-    {
-        super('Material Output');
-        this.In = [
-            new NodeInput('Material', this, 'material')
-        ]
-        this.threeMaterialReference = threeMaterialReference
-        this.threeReference = threeReference
-
-        this.textureLoader = new this.threeReference.TextureLoader();
-
-        this.textureCache = {};
-    }
-
-    textureLoader;
-
-    Update() {
-        const mat = this.GetInputValue('Material');
-        if (!mat) return;
-
-        const diffuse = mat.diffuse;
-
-        // --- PROCEDURAL TEXTURE ---
-        if (diffuse && diffuse.Sample) {
-            const size = 256;
-            const data = new Uint8Array(size * size * 3);
-
-            for (let y = 0; y < size; y++) {
-                for (let x = 0; x < size; x++) {
-                    const u = x / size;
-                    const v = y / size;
-
-                    const color = diffuse.Sample(u, v);
-
-                    const i = (y * size + x) * 3;
-                    data[i] = color[0] * 255;
-                    data[i + 1] = color[1] * 255;
-                    data[i + 2] = color[2] * 255;
-                }
-            }
-
-            const texture = new this.threeReference.DataTexture(
-                data,
-                size,
-                size,
-                this.threeReference.RGBFormat
-            );
-
-            texture.needsUpdate = true;
-
-            this.threeMaterialReference.map = texture;
-            this.threeMaterialReference.needsUpdate = true;
-
-            return;
-        }
-
-        // --- IMAGE TEXTURE ---
-        if (diffuse && diffuse.Path) {
-            if (!this.textureCache[diffuse.Path]) {
-                this.textureCache[diffuse.Path] = this.textureLoader.load(diffuse.Path, () => {
-                    this.threeMaterialReference.needsUpdate = true;
-                });
-            }
-
-            this.threeMaterialReference.map = this.textureCache[diffuse.Path];
-            return;
-        }
-
-        // --- COLOR ---
-        if (Array.isArray(diffuse)) {
-            this.threeMaterialReference.color =
-                new this.threeReference.Color(diffuse[0], diffuse[1], diffuse[2]);
-        }
-    }
-}
-
-class ColorNode extends Node
-{
-    Explanation = new StaticValue('Explanation', '(0-255)', this, 'string')
-    constructor()
-    {
-        super('Color');
-        
-        this.Explanation.Settings.ReadOnly = true;
-        this.Explanation.Settings.HideValueName = true;
-
-        this.In = [
-
-        ]
-
-        const rstatic = new StaticValue('R', 255, this, 'float');
-        const gstatic = new StaticValue('G', 255, this, 'float');
-        const bstatic = new StaticValue('B', 255, this, 'float');
-
-        this.StaticValues = [
-            rstatic,
-            gstatic,
-            bstatic,
-            this.Explanation
-        ]
-
-        this.Out = [
-            new NodeOutput('Output', this, 'color')
-        ]
-    }
-
-    Update()
-    {
-        this.Out[0].GetValue = function()
-        {
-            return [
-                this.ParentNode.GetStaticValue('R') / 255,
-                this.ParentNode.GetStaticValue('G') / 255,
-                this.ParentNode.GetStaticValue('B') / 255,
-            ]
-        }
-    }
-}
-
-class ColorMultiplyNode extends Node
-{
-    Explanation = new StaticValue('Explanation', 'A * B', this, 'string')
-    constructor()
-    {
-        super('Color Multiply (x)');
-        this.In = [
-            new NodeInput('A', this, 'color'),
-            new NodeInput('B', this, 'color')
-        ]
-
-        this.Out = [
-            new NodeOutput('Output', this, 'color')
-        ]
-
-        this.Explanation.Settings.ReadOnly = true;
-        this.Explanation.Settings.HideValueName = true;
-        this.StaticValues = [
-            this.Explanation
-        ]
-    }
-
-    Update()
-    {
-        this.Out[0].GetValue = function()
-        {
-            return [
-                this.ParentNode.GetInputValue('A')[0] * this.ParentNode.GetInputValue('B')[0],
-                this.ParentNode.GetInputValue('A')[1] * this.ParentNode.GetInputValue('B')[1],
-                this.ParentNode.GetInputValue('A')[2] * this.ParentNode.GetInputValue('B')[2],
-            ]
-        }
-    }
-}
-
-class ColorDivideNode extends Node
-{
-    Explanation = new StaticValue('Explanation', 'A ÷ B', this, 'string')
-    constructor()
-    {
-        super('Color Divide (÷)');
-        this.In = [
-            new NodeInput('A', this, 'color'),
-            new NodeInput('B', this, 'color')
-        ]
-
-        this.Out = [
-            new NodeOutput('Output', this, 'color')
-        ]
-
-        this.Explanation.Settings.ReadOnly = true;
-        this.Explanation.Settings.HideValueName = true;
-        this.StaticValues = [
-            this.Explanation
-        ]
-    }
-
-    Update()
-    {
-        this.Out[0].GetValue = function()
-        {
-            return [
-                this.ParentNode.GetInputValue('A')[0] / this.ParentNode.GetInputValue('B')[0],
-                this.ParentNode.GetInputValue('A')[1] / this.ParentNode.GetInputValue('B')[1],
-                this.ParentNode.GetInputValue('A')[2] / this.ParentNode.GetInputValue('B')[2],
-            ]
-        }
-    }
-}
-
-class ColorAddNode extends Node
-{
-    Explanation = new StaticValue('Explanation', 'A + B', this, 'string')
-    constructor()
-    {
-        super('Color Add (+)');
-        this.In = [
-            new NodeInput('A', this, 'color'),
-            new NodeInput('B', this, 'color')
-        ]
-
-        this.Out = [
-            new NodeOutput('Output', this, 'color')
-        ]
-
-        this.Explanation.Settings.ReadOnly = true;
-        this.Explanation.Settings.HideValueName = true;
-        this.StaticValues = [
-            this.Explanation
-        ]
-    }
-
-    Update()
-    {
-        this.Out[0].GetValue = function()
-        {
-            return [
-                this.ParentNode.GetInputValue('A')[0] + this.ParentNode.GetInputValue('B')[0],
-                this.ParentNode.GetInputValue('A')[1] + this.ParentNode.GetInputValue('B')[1],
-                this.ParentNode.GetInputValue('A')[2] + this.ParentNode.GetInputValue('B')[2],
-            ]
-        }
-    }
-}
-
-class ColorSubtractNode extends Node
-{
-    Explanation = new StaticValue('Explanation', 'A - B', this, 'string')
-    constructor()
-    {
-        super('Color Subtract (+)');
-        this.In = [
-            new NodeInput('A', this, 'color'),
-            new NodeInput('B', this, 'color')
-        ]
-
-        this.Out = [
-            new NodeOutput('Output', this, 'color')
-        ]
-
-        this.Explanation.Settings.ReadOnly = true;
-        this.Explanation.Settings.HideValueName = true;
-        this.StaticValues = [
-            this.Explanation
-        ]
-    }
-
-    Update()
-    {
-        this.Out[0].GetValue = function()
-        {
-            return [
-                this.ParentNode.GetInputValue('A')[0] - this.ParentNode.GetInputValue('B')[0],
-                this.ParentNode.GetInputValue('A')[1] - this.ParentNode.GetInputValue('B')[1],
-                this.ParentNode.GetInputValue('A')[2] - this.ParentNode.GetInputValue('B')[2],
-            ]
-        }
-    }
-}
-
-class ColorMixNode extends Node
-{
-    Explanation = new StaticValue('Explanation', 'A * (1 - Mix) + B * Mix', this, 'string')
-    constructor()
-    {
-        super('Color Mix');
-        this.In = [
-            new NodeInput('A', this, 'color'),
-            new NodeInput('B', this, 'color'),
-            new NodeInput('Mix', this, 'float')
-        ]
-
-        this.Out = [
-            new NodeOutput('Output', this, 'color')
-        ]
-
-        this.Explanation.Settings.ReadOnly = true;
-        this.Explanation.Settings.HideValueName = true;
-        this.StaticValues = [
-            this.Explanation
-        ]
-    }
-
-    Update()
-    {
-        this.Out[0].GetValue = function()
-        {
-            return [
-                this.ParentNode.GetInputValue('A')[0] * (1 - this.ParentNode.GetInputValue('Mix')) + this.ParentNode.GetInputValue('B')[0] * this.ParentNode.GetInputValue('Mix'),
-                this.ParentNode.GetInputValue('A')[1] * (1 - this.ParentNode.GetInputValue('Mix')) + this.ParentNode.GetInputValue('B')[1] * this.ParentNode.GetInputValue('Mix'),
-                this.ParentNode.GetInputValue('A')[2] * (1 - this.ParentNode.GetInputValue('Mix')) + this.ParentNode.GetInputValue('B')[2] * this.ParentNode.GetInputValue('Mix'),
-            ]
-        }
-    }
-}
+// TODO: PBR MATERIAL NODES
 
 class SinNode extends Node
 {
@@ -2306,17 +1821,7 @@ const IO_NODE_SET = [
 ]
 
 const TEXTURE_NODE_SET = [
-    MaterialOutputNode,
-    MaterialNode,
-    ColorNode,
-    ColorAddNode,
-    ColorSubtractNode,
-    ColorMultiplyNode,
-    ColorDivideNode,
-    ColorMixNode,
-    TextureNode,
-    NoiseNode,
-    Sampler2DNode
+    
 ]
 
 const STANDARD_NODE_SET = [

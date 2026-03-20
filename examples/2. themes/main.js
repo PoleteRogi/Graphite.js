@@ -3,7 +3,7 @@ const wrapper = new NodeWrapper();
 
 // link canvas to it
 wrapper.LinkCanvas(document.getElementById('graphite-canvas'));
-wrapper.LoadTheme('../../src/themes/elegantSlate.json')
+wrapper.LoadTheme('../../src/themes/glass.json')
 
 // register the node sets (the nodes the app will use)
 NodeRegistry.RegisterSet(STANDARD_NODE_SET);
